@@ -42,6 +42,7 @@ serialPort.open(QIODevice.ReadOnly)
 
 readData = serialPort.readAll()
 for i in range(5):
+
   serialPort.waitForReadyRead(4000)
   readData.append(serialPort.readAll())
 
