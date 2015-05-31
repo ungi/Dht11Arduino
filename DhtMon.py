@@ -1,5 +1,7 @@
 import sys
 import time
+from ftplib import FTP
+
 
 # from PyQt5.QtSerialPort import QSerialPort
 # from PyQt5.QtSerialPort import QSerialPortInfo
@@ -47,6 +49,7 @@ for i in range(5):
 bs = bytes(readData)
 
 print(bs.decode('ascii', 'ignore'))
+
 
 
 sys.exit(0)
