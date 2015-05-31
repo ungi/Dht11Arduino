@@ -29,23 +29,24 @@ except ValueError:
   print("Could not cast item to QSerialPort!")
   sys.exit(1)
 
+serialPort.setBaudRate(115200)
+
 print("Arduino was found on port ", serialPort.portName())
+print("Baud rate:", serialPort.baudRate())
 
 print("Trying to read data")
 
 serialPort.open(QIODevice.ReadOnly)
 
 readData = serialPort.readAll()
-serialPort.waitForReadyRead(4000)
-readData.append(serialPort.readAll())
-serialPort.waitForReadyRead(4000)
-readData.append(serialPort.readAll())
-serialPort.waitForReadyRead(4000)
-readData.append(serialPort.readAll())
-serialPort.waitForReadyRead(4000)
-readData.append(serialPort.readAll())
+for i in range(5):
+  serialPort.waitForReadyRead(4000)
+  readData.append(serialPort.readAll())
 
 #print(str(readData).decode("utf-8", "strict"))
-print(str(readData).decode(encoding='UTF-8'))
+bs = bytes(readData)
+
+print(bs.decode('ascii', 'ignore'))
+
 
 sys.exit(0)
