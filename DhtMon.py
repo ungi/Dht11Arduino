@@ -1,6 +1,5 @@
+import argparse
 import sys
-import time
-from ftplib import FTP
 
 
 # from PyQt5.QtSerialPort import QSerialPort
@@ -9,6 +8,13 @@ from PyQt5.QtSerialPort import *
 from PyQt5.QtCore import *
 
 
+print()
+
+argparser = argparse.ArgumentParser(description='Log data from DHT11 temperature and humidity sensor.')
+argparser.add_argument('OutputFile', default='DHT11Log.csv')
+args = argparser.parse_args()
+
+print('Output will be logged in:', args.OutputFile)
 
 print("Searching for Arduino on serail ports...")
 
@@ -41,8 +47,8 @@ print("Trying to read data")
 serialPort.open(QIODevice.ReadOnly)
 
 readData = serialPort.readAll()
-for i in range(5):
 
+for i in range(2):
   serialPort.waitForReadyRead(4000)
   readData.append(serialPort.readAll())
 
