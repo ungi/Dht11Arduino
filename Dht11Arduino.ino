@@ -7,40 +7,39 @@ dht11 DHT11;
 void setup()
 {
   Serial.begin(115200);
-  Serial.println("DHT11 TEST PROGRAM ");
-  Serial.print("LIBRARY VERSION: ");
-  Serial.println(DHT11LIB_VERSION);
-  Serial.println();
+  // Serial.println("DHT11 TEST PROGRAM ");
+  // Serial.print("LIBRARY VERSION: ");
+  // Serial.println(DHT11LIB_VERSION);
+  // Serial.println();
 }
 
 void loop()
 {
-  Serial.println("\n");
-
   int chk = DHT11.read(DHT11PIN);
 
-  Serial.print("Read sensor: ");
   switch (chk)
   {
     case DHTLIB_OK: 
-		Serial.println("OK"); 
+		Serial.print("OK."); 
 		break;
     case DHTLIB_ERROR_CHECKSUM: 
-		Serial.println("Checksum error"); 
+		Serial.print("Checksum error"); 
 		break;
     case DHTLIB_ERROR_TIMEOUT: 
-		Serial.println("Time out error"); 
+		Serial.print("Time out error"); 
 		break;
     default: 
-		Serial.println("Unknown error"); 
+		Serial.print("Unknown error"); 
 		break;
   }
 
-  Serial.print("Humidity (%): ");
-  Serial.println((float)DHT11.humidity, 2);
+  Serial.print("H:");
+  Serial.print((float)DHT11.humidity, 2);
 
-  Serial.print("Temperature (°C): ");
-  Serial.println((float)DHT11.temperature, 2);
-
+  Serial.print("T:");
+  Serial.print((float)DHT11.temperature, 2);
+  Serial.print(";");
+  
+  Serial.println();
   delay(2000);
 }
