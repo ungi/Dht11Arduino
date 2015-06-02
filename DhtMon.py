@@ -77,12 +77,15 @@ while True:
   #print("T:", tTxt)
 
   # Write output to file.
-  f = open(args.OutputFile, 'a', newline='')
-  outputWriter = csv.writer(f, delimiter=',')
-  timeStamp = time.time()
-  dateTimeStamp = datetime.datetime.fromtimestamp(timeStamp).strftime('%Y-%m-%d %H:%M:%S')
-  outputWriter.writerow([dateTimeStamp, hTxt, tTxt])
-  f.close()
+  try:
+    f = open(args.OutputFile, 'a', newline='')
+    outputWriter = csv.writer(f, delimiter=',')
+    timeStamp = time.time()
+    dateTimeStamp = datetime.datetime.fromtimestamp(timeStamp).strftime('%Y-%m-%d %H:%M:%S')
+    outputWriter.writerow([dateTimeStamp, hTxt, tTxt])
+    f.close()
+  except:
+    print("Warning: Unable to write output file. Data dropped.")
 
   time.sleep(samplingDelaySec)
 
