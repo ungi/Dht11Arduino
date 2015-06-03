@@ -57,10 +57,6 @@ readData = serialPort.readAll()
 
 samplingDelaySec = float(args.SamplingIntervalMin) * 60.0
 
-# Prepare for email sending
-
-address_book = ['ungi.tamas@gmail.com', 'ungi@queensu.ca']
-
 # Main loop
 
 while True:
@@ -99,12 +95,14 @@ while True:
 
   # Sending email.
 
+  address_book = ['ungi.tamas@gmail.com', 'ungi@queensu.ca']
+  sender = "perk.lab.log@gmail.com"
   msg = MIMEMultipart()
   msg['From'] = 'perk.lab.log@gmail.com'
   msg['To'] = ','.join(address_book)
   msg['Subject'] = "Lab humidity = " + hTxt + "%, temp = " + tTxt + "C [end]"
-  body=''
-  msg.attach(MIMEText(body, 'plain'))
+  # body='No email body.'
+  # msg.attach(MIMEText(body, 'plain'))
   text=msg.as_string()
   server = smtplib.SMTP('smtp.gmail.com:587')
   server.ehlo()
