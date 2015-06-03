@@ -19,7 +19,7 @@ argparser = argparse.ArgumentParser(description='Log data from DHT11 temperature
 argparser.add_argument('-o', '--OutputFile', default='DHT11Log.csv', help='File where the output will be written (CSV format).')
 argparser.add_argument('-s', '--SamplingIntervalMin', type=float, default=0.05, help='Period in minutes between two consecutive measurements.')
 argparser.add_argument('-t', '--ThresholdCelsius', type=float, default=24.0, help='Trigger threshold temperature that activates warning.')
-argparser.add_argument('-d', '--DebugMode', help='Set this for debug mode logging.')
+argparser.add_argument('-d', '--DebugMode', action='store_true', help='Set this for debug mode logging.')
 args = argparser.parse_args()
 
 if args.DebugMode:
@@ -110,18 +110,17 @@ while True:
   hTxt = dataString[hPos+2:tPos]
   tTxt = dataString[tPos+2:endPos]
 
-  SendEmail = True
+  SendEmail = False
   try:
     CurrentTemp = float(tTxt)
+    CurrentTemp = ( CurrentTemp + LastTemp ) / 2.0 # Noise filtering.
   except:
     logging.error('tTxt cannot be converted:' + tTxt)
     continue
   if LastTemp != -1.0:
-    if CurrentTemp > TemperatureThreshold and LastTemp <= TemperatureThreshold:
-      SendEmail = True
-    if CurrentTemp <= TemperatureThreshold and LastTemp > TemperatureThreshold:
-      SendEmail = True
-    if CurrentTemp > TemperatureThreshold+2.0:
+    #if CurrentTemp > TemperatureThreshold and LastTemp <= TemperatureThreshold: SendEmail = True
+    #if CurrentTemp <= TemperatureThreshold and LastTemp > TemperatureThreshold: SendEmail = True
+    if CurrentTemp > TemperatureThreshold:
       SendEmail = True
   LastTemp = CurrentTemp
 
