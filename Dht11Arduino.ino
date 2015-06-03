@@ -34,10 +34,10 @@ void loop()
   }
 
   Serial.print("H:");
-  Serial.print((float)DHT11.humidity, 2);
+  Serial.print((float)DHT11.humidity, 1);
 
   Serial.print("T:");
-  Serial.print((float)DHT11.temperature, 2);
+  Serial.print((float)DHT11.temperature, 1);
   Serial.print(";");
   
   Serial.println();

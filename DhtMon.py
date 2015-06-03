@@ -19,10 +19,13 @@ print()
 argparser = argparse.ArgumentParser(description='Log data from DHT11 temperature and humidity sensor.')
 argparser.add_argument('-o', '--OutputFile', default='DHT11Log.csv', help='File where the output will be written (CSV format).')
 argparser.add_argument('-s', '--SamplingIntervalMin', type=float, default=0.05, help='Period in minutes between two consecutive measurements.')
+argparser.add_argument('-t', '--ThresholdCelsius', type=float, default=24.0, help='Trigger threshold temperature that activates warning.')
 args = argparser.parse_args()
 
+TemperatureThreshold = float(args.ThresholdCelsius)
 print('Output will be logged in:', args.OutputFile)
 print('Data sampling interval:', float(args.SamplingIntervalMin))
+print('Temperature threshold:', TemperatureThreshold)
 
 print("Searching for Arduino on serail ports...")
 
@@ -57,6 +60,11 @@ readData = serialPort.readAll()
 
 samplingDelaySec = float(args.SamplingIntervalMin) * 60.0
 
+# State variables
+
+LastTemp = -1.0
+CurrentTemp = -1.0
+
 # Main loop
 
 while True:
@@ -79,8 +87,15 @@ while True:
     print("Error parsing message from Arduino: ", str(dataString))
   hTxt = dataString[hPos+2:tPos]
   tTxt = dataString[tPos+2:endPos]
-  #print("H:", hTxt)
-  #print("T:", tTxt)
+
+  SendEmail = False
+  CurrentTemp = float(tTxt)
+  if LastTemp != -1.0:
+    if CurrentTemp > TemperatureThreshold and LastTemp <= TemperatureThreshold:
+      SendEmail = True
+    if CurrentTemp <= TemperatureThreshold and LastTemp > TemperatureThreshold:
+      SendEmail = True
+  LastTemp = CurrentTemp
 
   # Write output to file.
   try:
@@ -95,26 +110,24 @@ while True:
 
   # Sending email.
 
-  address_book = ['ungi.tamas@gmail.com', 'ungi@queensu.ca']
-  sender = "perk.lab.log@gmail.com"
-  msg = MIMEMultipart()
-  msg['From'] = 'perk.lab.log@gmail.com'
-  msg['To'] = ','.join(address_book)
-  msg['Subject'] = "Lab humidity = " + hTxt + "%, temp = " + tTxt + "C [end]"
-  # body='No email body.'
-  # msg.attach(MIMEText(body, 'plain'))
-  text=msg.as_string()
-  server = smtplib.SMTP('smtp.gmail.com:587')
-  server.ehlo()
-  server.starttls()
-  try:
-    server.login('perk.lab.log@gmail.com', 'gaborgoodwin')
-  except:
-    print("Email login error")
-  try:
-    server.sendmail(sender,address_book, text)
-  except:
-    print("Error sending email")
+  if SendEmail == True:
+    sender = "perk.lab.log@gmail.com"
+    msg = MIMEMultipart()
+    msg['From'] = 'perk.lab.log@gmail.com'
+    msg['To'] = 'ungi.tamas@gmail.com, ungi@queensu.ca'
+    msg['Subject'] = "Lab humidity = " + hTxt + "%, temp = " + tTxt + "C [end]"
+    text=msg.as_string()
+    server = smtplib.SMTP('smtp.gmail.com:587')
+    server.ehlo()
+    server.starttls()
+    try:
+      server.login('perk.lab.log@gmail.com', 'gaborgoodwin')
+    except:
+      print("Email login error")
+    try:
+      server.sendmail(sender,address_book, text)
+    except:
+      print("Error sending email")
 
   time.sleep(samplingDelaySec)
 
