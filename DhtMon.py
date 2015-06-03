@@ -1,8 +1,12 @@
 import argparse
 import sys
 import csv
+import smtplib
 import time
 import datetime
+
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # from PyQt5.QtSerialPort import QSerialPort
 # from PyQt5.QtSerialPort import QSerialPortInfo
@@ -53,6 +57,12 @@ readData = serialPort.readAll()
 
 samplingDelaySec = float(args.SamplingIntervalMin) * 60.0
 
+# Prepare for email sending
+
+address_book = ['ungi.tamas@gmail.com', 'ungi@queensu.ca']
+
+# Main loop
+
 while True:
   for i in range(2):
     serialPort.waitForReadyRead(3000)
@@ -86,6 +96,27 @@ while True:
     f.close()
   except:
     print("Warning: Unable to write output file. Data dropped.")
+
+  # Sending email.
+
+  msg = MIMEMultipart()
+  msg['From'] = 'perk.lab.log@gmail.com'
+  msg['To'] = ','.join(address_book)
+  msg['Subject'] = "Lab humidity = " + hTxt + "%, temp = " + tTxt + "C [end]"
+  body=''
+  msg.attach(MIMEText(body, 'plain'))
+  text=msg.as_string()
+  server = smtplib.SMTP('smtp.gmail.com:587')
+  server.ehlo()
+  server.starttls()
+  try:
+    server.login('perk.lab.log@gmail.com', 'gaborgoodwin')
+  except:
+    print("Email login error")
+  try:
+    server.sendmail(sender,address_book, text)
+  except:
+    print("Error sending email")
 
   time.sleep(samplingDelaySec)
 
