@@ -1,6 +1,7 @@
 import argparse
 import sys
 import csv
+import logging
 import smtplib
 import time
 import datetime
@@ -14,13 +15,19 @@ from PyQt5.QtSerialPort import *
 from PyQt5.QtCore import *
 
 
-print()
-
 argparser = argparse.ArgumentParser(description='Log data from DHT11 temperature and humidity sensor.')
 argparser.add_argument('-o', '--OutputFile', default='DHT11Log.csv', help='File where the output will be written (CSV format).')
 argparser.add_argument('-s', '--SamplingIntervalMin', type=float, default=0.05, help='Period in minutes between two consecutive measurements.')
 argparser.add_argument('-t', '--ThresholdCelsius', type=float, default=24.0, help='Trigger threshold temperature that activates warning.')
+argparser.add_argument('-d', '--DebugMode', help='Set this for debug mode logging.')
 args = argparser.parse_args()
+
+if args.DebugMode:
+  logging.basicConfig(filename='DhtMonLog.txt',level=logging.DEBUG)
+else:
+  logging.basicConfig(filename='DhtMonLog.txt',level=logging.INFO)
+logging.basicConfig(format='%(asctime)s %(message)s')
+
 
 TemperatureThreshold = float(args.ThresholdCelsius)
 print('Output will be logged in:', args.OutputFile)
@@ -68,32 +75,53 @@ CurrentTemp = -1.0
 # Main loop
 
 while True:
-  for i in range(2):
-    serialPort.waitForReadyRead(3000)
-    readData.append(serialPort.readAll())
+  # Flush the buffer.
+  serialPort.waitForReadyRead(5000)
+  readData = serialPort.readAll()
+  time.sleep(2.5) # Wait for fresh data.
+  # Read new data.
+  serialPort.waitForReadyRead(5000)
+  readData = serialPort.readAll()
+
+  #for i in range(2):
+  #  serialPort.waitForReadyRead(3000)
+  #  readData.append(serialPort.readAll())
 
   # Find first set of measurement values.
 
   bs = bytes(readData)
   dataString = bs.decode('ascii', 'ignore')
+
+  logging.debug(dataString)
+
   firstPos = dataString.find('OK.')
   #print("First position:", firstPos)
   hPos = dataString.find("H:", firstPos, len(dataString)-firstPos)
   tPos = dataString.find("T:", firstPos, len(dataString)-firstPos)
   endPos = dataString.find(";", firstPos, len(dataString)-firstPos)
-  if len(dataString)-firstPos < 18:
+  if len(dataString)-firstPos < 16:
     print("Error: Message too short:", str(dataString))
+    logging.error('Message too short, length=' + str(len(dataString)) + " -- msg=" + str(dataString))
+    continue
   if hPos == -1 or tPos == -1:
     print("Error parsing message from Arduino: ", str(dataString))
+    logging.error('Error parsing message from Arduino: ' + str(dataString))
+    continue
   hTxt = dataString[hPos+2:tPos]
   tTxt = dataString[tPos+2:endPos]
 
-  SendEmail = False
-  CurrentTemp = float(tTxt)
+  SendEmail = True
+  try:
+    CurrentTemp = float(tTxt)
+  except:
+    logging.error('tTxt cannot be converted:' + tTxt)
+    continue
   if LastTemp != -1.0:
     if CurrentTemp > TemperatureThreshold and LastTemp <= TemperatureThreshold:
       SendEmail = True
     if CurrentTemp <= TemperatureThreshold and LastTemp > TemperatureThreshold:
+      SendEmail = True
+    if CurrentTemp > TemperatureThreshold+2.0:
       SendEmail = True
   LastTemp = CurrentTemp
 
@@ -103,18 +131,22 @@ while True:
     outputWriter = csv.writer(f, delimiter=',')
     timeStamp = time.time()
     dateTimeStamp = datetime.datetime.fromtimestamp(timeStamp).strftime('%Y-%m-%d %H:%M:%S')
+    logging.debug("Computed timestamp for log file: " + dateTimeStamp)
     outputWriter.writerow([dateTimeStamp, hTxt, tTxt])
     f.close()
   except:
     print("Warning: Unable to write output file. Data dropped.")
+    logging.error(sys.exc_info()[0])
+    continue
 
   # Sending email.
+  toAddress = 'ungi.tamas@gmail.com, ungi@queensu.ca'
 
   if SendEmail == True:
     sender = "perk.lab.log@gmail.com"
     msg = MIMEMultipart()
     msg['From'] = 'perk.lab.log@gmail.com'
-    msg['To'] = 'ungi.tamas@gmail.com, ungi@queensu.ca'
+    msg['To'] = toAddress
     msg['Subject'] = "Lab humidity = " + hTxt + "%, temp = " + tTxt + "C [end]"
     text=msg.as_string()
     server = smtplib.SMTP('smtp.gmail.com:587')
@@ -124,10 +156,13 @@ while True:
       server.login('perk.lab.log@gmail.com', 'gaborgoodwin')
     except:
       print("Email login error")
+      logging.error(sys.exc_info()[0])
     try:
-      server.sendmail(sender,address_book, text)
+      server.sendmail(sender,toAddress, text)
+      logging.debug('Email sent')
     except:
       print("Error sending email")
+      logging.error(sys.exc_info()[0])
 
   time.sleep(samplingDelaySec)
 

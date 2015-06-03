@@ -7,10 +7,6 @@ dht11 DHT11;
 void setup()
 {
   Serial.begin(115200);
-  // Serial.println("DHT11 TEST PROGRAM ");
-  // Serial.print("LIBRARY VERSION: ");
-  // Serial.println(DHT11LIB_VERSION);
-  // Serial.println();
 }
 
 void loop()
@@ -40,6 +36,5 @@ void loop()
   Serial.print((float)DHT11.temperature, 1);
   Serial.print(";");
   
-  Serial.println();
   delay(2000);
 }
