@@ -100,13 +100,14 @@ while True:
   logging.debug("Received string: " + dataString)
 
   FirstPos = dataString.find("OK.")
-  HumidPos = dataString.find("H:", FirstPos, len(dataString) - FirstPos)
-  TemprPos = dataString.find("T:", FirstPos, len(dataString) - FirstPos)
-  EndPos   = dataString.find(";", FirstPos, len(dataString) - FirstPos)
   if len(dataString) - FirstPos < 16:
     print("Error: Message too short:", str(dataString))
     logging.error('Message too short, length=' + str(len(dataString)) + " -- msg=" + str(dataString))
     continue
+
+  HumidPos = dataString.find("H:", FirstPos, len(dataString))
+  TemprPos = dataString.find("T:", FirstPos, len(dataString))
+  EndPos   = dataString.find(";", FirstPos, len(dataString))
   if HumidPos == -1:
     logging.error('Error parsing message from Arduino: ' + str(dataString))
     logging.error("Could not find: H:")
@@ -177,14 +178,14 @@ while True:
 
   # Sending email.
 
-  toAddress = 'ungi@cs.queensu.ca; ungi.tamas@gmail.com'
+  Recipients = ["ungi@queensu.ca", "ungi.tamas@gmail.com"]
 
   if SendEmail == True:
     sender = "perk.lab.log@gmail.com"
     msg = MIMEMultipart()
     msg['From'] = 'perk.lab.log@gmail.com'
-    msg['To'] = toAddress
-    msg['Subject'] = "Lab humidity = " + HumidText + "%, temp = " + str(FilteredCurrentTemp) + "C [end]"
+    msg['To'] = 'Undisclosed recipients'
+    msg['Subject'] = "Perk Lab humidity = " + HumidText + "%, temperature = " + str(FilteredCurrentTemp) + "C [end]"
     text=msg.as_string()
     server = smtplib.SMTP('smtp.gmail.com:587')
     server.ehlo()
@@ -195,7 +196,7 @@ while True:
       print("Email login error")
       logging.error(sys.exc_info()[0])
     try:
-      server.sendmail(sender,toAddress, text)
+      server.sendmail(sender, Recipients, text)
       logging.debug('Email sent')
     except:
       print("Error sending email")
