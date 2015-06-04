@@ -16,6 +16,7 @@ from PyQt5.QtCore import *
 
 argparser = argparse.ArgumentParser(description='Log data from DHT11 temperature and humidity sensor.')
 argparser.add_argument('-o', '--OutputFile', default='DHT11Log.csv', help='File where the output will be written (CSV format).')
+argparser.add_argument('-p', '--PasswordFile', default='password.txt', help='File that stores email smtp password in its first line.')
 argparser.add_argument('-s', '--SamplingIntervalMin', type=float, default=0.05, help='Period in minutes between two consecutive measurements.')
 argparser.add_argument('-t', '--ThresholdCelsius', type=float, default=24.0, help='Trigger threshold temperature that activates warning.')
 argparser.add_argument('-d', '--DebugMode', action='store_true', help='Set this for debug mode logging.')
@@ -32,6 +33,7 @@ TemperatureThreshold = float(args.ThresholdCelsius)
 # Print parameters, so user can check if they are right.
 
 print('Output will be logged in:', args.OutputFile)
+print('Email smtp password file:', args.PasswordFile)
 print('Data will be recorded in every', float(args.SamplingIntervalMin), "minutes")
 print('Temperature threshold:', TemperatureThreshold)
 
@@ -178,6 +180,14 @@ while True:
 
   # Sending email.
 
+  try:
+    PasswordFile = open(args.PasswordFile, "r")
+    SmtpPassword = PasswordFile.readline()
+    PasswordFile.close()
+  except:
+    logging.error("Unable to read password.txt. Email will not be sent.")
+    SendEmail = False
+
   Recipients = ["ungi@queensu.ca", "ungi.tamas@gmail.com"]
 
   if SendEmail == True:
@@ -191,7 +201,7 @@ while True:
     server.ehlo()
     server.starttls()
     try:
-      server.login('perk.lab.log@gmail.com', 'gaborgoodwin')
+      server.login('perk.lab.log@gmail.com', SmtpPassword)
     except:
       print("Email login error")
       logging.error(sys.exc_info()[0])
