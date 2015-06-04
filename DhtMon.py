@@ -1,19 +1,18 @@
 import argparse
-import sys
 import csv
+import datetime
 import logging
 import smtplib
+import sys
 import time
-import datetime
 
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# from PyQt5.QtSerialPort import QSerialPort
-# from PyQt5.QtSerialPort import QSerialPortInfo
 from PyQt5.QtSerialPort import *
 from PyQt5.QtCore import *
 
+# Parse command line arguments.
 
 argparser = argparse.ArgumentParser(description='Log data from DHT11 temperature and humidity sensor.')
 argparser.add_argument('-o', '--OutputFile', default='DHT11Log.csv', help='File where the output will be written (CSV format).')
@@ -28,16 +27,19 @@ else:
   logging.basicConfig(filename='DhtMonLog.txt',level=logging.INFO)
 logging.basicConfig(format='%(asctime)s %(message)s')
 
-
 TemperatureThreshold = float(args.ThresholdCelsius)
+
+# Print parameters, so user can check if they are right.
+
 print('Output will be logged in:', args.OutputFile)
-print('Data sampling interval:', float(args.SamplingIntervalMin))
+print('Data will be recorded in every', float(args.SamplingIntervalMin), "minutes")
 print('Temperature threshold:', TemperatureThreshold)
+
+# Find Arduino device.
 
 print("Searching for Arduino on serail ports...")
 
 portList = QSerialPortInfo.availablePorts()
-
 portReader = None
 
 for portItem in portList:
@@ -58,80 +60,110 @@ except ValueError:
 serialPort.setBaudRate(115200)
 
 print("Arduino was found on port ", serialPort.portName())
-# print("Baud rate:", serialPort.baudRate())
 
 serialPort.open(QIODevice.ReadOnly)
 readData = serialPort.readAll()
 
 # Computing sampling delay.
 
-samplingDelaySec = float(args.SamplingIntervalMin) * 60.0
+SamplingDelaySec = float(args.SamplingIntervalMin) * 60.0
 
 # State variables
 
 LastTemp = -1.0
 CurrentTemp = -1.0
+LastGreetingDay = ""
+LastWarningHour = ""
 
 # Main loop
 
 while True:
-  # Flush the buffer.
+  logging.debug("Loop cycle started -----------------------------------")
+
+  # Flush the message buffer.
+
   serialPort.waitForReadyRead(5000)
   readData = serialPort.readAll()
+
   time.sleep(2.5) # Wait for fresh data.
+
   # Read new data.
+
   serialPort.waitForReadyRead(5000)
   readData = serialPort.readAll()
 
-  #for i in range(2):
-  #  serialPort.waitForReadyRead(3000)
-  #  readData.append(serialPort.readAll())
+  # Find measurement values in the received message.
 
-  # Find first set of measurement values.
+  ByteString = bytes(readData)
+  dataString = ByteString.decode('ascii', 'ignore')
 
-  bs = bytes(readData)
-  dataString = bs.decode('ascii', 'ignore')
+  logging.debug("Received string: " + dataString)
 
-  logging.debug(dataString)
-
-  firstPos = dataString.find('OK.')
-  #print("First position:", firstPos)
-  hPos = dataString.find("H:", firstPos, len(dataString)-firstPos)
-  tPos = dataString.find("T:", firstPos, len(dataString)-firstPos)
-  endPos = dataString.find(";", firstPos, len(dataString)-firstPos)
-  if len(dataString)-firstPos < 16:
+  FirstPos = dataString.find("OK.")
+  HumidPos = dataString.find("H:", FirstPos, len(dataString) - FirstPos)
+  TemprPos = dataString.find("T:", FirstPos, len(dataString) - FirstPos)
+  EndPos   = dataString.find(";", FirstPos, len(dataString) - FirstPos)
+  if len(dataString) - FirstPos < 16:
     print("Error: Message too short:", str(dataString))
     logging.error('Message too short, length=' + str(len(dataString)) + " -- msg=" + str(dataString))
     continue
-  if hPos == -1 or tPos == -1:
-    print("Error parsing message from Arduino: ", str(dataString))
+  if HumidPos == -1:
     logging.error('Error parsing message from Arduino: ' + str(dataString))
+    logging.error("Could not find: H:")
     continue
-  hTxt = dataString[hPos+2:tPos]
-  tTxt = dataString[tPos+2:endPos]
+  if TemprPos == -1:
+    logging.error('Error parsing message from Arduino: ' + str(dataString))
+    logging.error("Could not find: T:")
+    continue
+  HumidText = dataString[HumidPos + 2:TemprPos]
+  TemprText = dataString[TemprPos + 2:EndPos]
+
+  # Compute timestamp.
+
+  TimeStamp = time.time()
+  DateTimeStamp = datetime.datetime.fromtimestamp(TimeStamp).strftime('%Y-%m-%d %H:%M:%S')
+  DateStamp = datetime.datetime.fromtimestamp(TimeStamp).strftime('%Y-%m-%d')
+  HourStamp = datetime.datetime.fromtimestamp(TimeStamp).strftime('%H')
+
+  logging.debug("Computed timestamp for log file: " + DateTimeStamp)
+
+  # Decide if email needs to be sent.
 
   SendEmail = False
+
   try:
-    CurrentTemp = float(tTxt)
-    CurrentTemp = ( CurrentTemp + LastTemp ) / 2.0 # Noise filtering.
+    CurrentTemp = float(TemprText)
   except:
-    logging.error('tTxt cannot be converted:' + tTxt)
+    logging.error('TemprText cannot be converted:' + tTxt)
+    logging.error(sys.exc_info()[0])
     continue
-  if LastTemp != -1.0:
-    #if CurrentTemp > TemperatureThreshold and LastTemp <= TemperatureThreshold: SendEmail = True
-    #if CurrentTemp <= TemperatureThreshold and LastTemp > TemperatureThreshold: SendEmail = True
-    if CurrentTemp > TemperatureThreshold:
-      SendEmail = True
+
+  logging.debug("Current temp  = " + str(CurrentTemp))
+  logging.debug("Last temp     = " + str(LastTemp))
+
+  if LastTemp == -1.0:
+    FilteredCurrentTemp = CurrentTemp
+  else:
+    FilteredCurrentTemp = ( CurrentTemp + LastTemp ) / 2.0
+
+  logging.debug("Filtered temp = " + str(FilteredCurrentTemp))
+
+  if LastTemp != -1.0 and FilteredCurrentTemp > TemperatureThreshold and LastWarningHour != HourStamp:
+    SendEmail = True
+    LastWarningHour = HourStamp
+
   LastTemp = CurrentTemp
 
-  # Write output to file.
+  if HourStamp == "08" and DateStamp != LastGreetingDay:  # Send an email at about 8 am every day.
+    SendEmail = True
+    LastGreetingDay = DateStamp
+
+  # Write current measurements in output to file.
+
   try:
     f = open(args.OutputFile, 'a', newline='')
     outputWriter = csv.writer(f, delimiter=',')
-    timeStamp = time.time()
-    dateTimeStamp = datetime.datetime.fromtimestamp(timeStamp).strftime('%Y-%m-%d %H:%M:%S')
-    logging.debug("Computed timestamp for log file: " + dateTimeStamp)
-    outputWriter.writerow([dateTimeStamp, hTxt, tTxt])
+    outputWriter.writerow([DateTimeStamp, HumidText, str(FilteredCurrentTemp)])
     f.close()
   except:
     print("Warning: Unable to write output file. Data dropped.")
@@ -139,14 +171,15 @@ while True:
     continue
 
   # Sending email.
-  toAddress = 'ungi.tamas@gmail.com, ungi@queensu.ca'
+
+  toAddress = 'ungi@cs.queensu.ca, ungi.tamas@gmail.com'
 
   if SendEmail == True:
     sender = "perk.lab.log@gmail.com"
     msg = MIMEMultipart()
     msg['From'] = 'perk.lab.log@gmail.com'
     msg['To'] = toAddress
-    msg['Subject'] = "Lab humidity = " + hTxt + "%, temp = " + tTxt + "C [end]"
+    msg['Subject'] = "Lab humidity = " + HumidText + "%, temp = " + str(FilteredCurrentTemp) + "C [end]"
     text=msg.as_string()
     server = smtplib.SMTP('smtp.gmail.com:587')
     server.ehlo()
@@ -163,7 +196,7 @@ while True:
       print("Error sending email")
       logging.error(sys.exc_info()[0])
 
-  time.sleep(samplingDelaySec)
+  time.sleep(SamplingDelaySec)
 
 
 sys.exit(0)
