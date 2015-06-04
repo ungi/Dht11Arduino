@@ -148,15 +148,20 @@ while True:
 
   logging.debug("Filtered temp = " + str(FilteredCurrentTemp))
 
-  if LastTemp != -1.0 and FilteredCurrentTemp > TemperatureThreshold and LastWarningHour != HourStamp:
-    SendEmail = True
-    LastWarningHour = HourStamp
+  if LastTemp != -1.0 and FilteredCurrentTemp > TemperatureThreshold:
+    if LastWarningHour != HourStamp:
+      SendEmail = True
+      LastWarningHour = HourStamp
+    else:
+      logging.debug("Skipping warning because HourStamp=" + HourStamp + " and LastWarningHour=" + LastWarningHour)
 
   LastTemp = CurrentTemp
 
   if HourStamp == "08" and DateStamp != LastGreetingDay:  # Send an email at about 8 am every day.
     SendEmail = True
+    logging.debug("Greeting, because DateStamp=" + DateStamp + " and LastGreetingDay=" + LastGreetingDay)
     LastGreetingDay = DateStamp
+
 
   # Write current measurements in output to file.
 
@@ -172,7 +177,7 @@ while True:
 
   # Sending email.
 
-  toAddress = 'ungi@cs.queensu.ca, ungi.tamas@gmail.com'
+  toAddress = 'ungi@cs.queensu.ca; ungi.tamas@gmail.com'
 
   if SendEmail == True:
     sender = "perk.lab.log@gmail.com"
