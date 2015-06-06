@@ -15,6 +15,7 @@ from PyQt5.QtCore import *
 # Parse command line arguments.
 
 argparser = argparse.ArgumentParser(description='Log data from DHT11 temperature and humidity sensor.')
+argparser.add_argument('-a', '--AddressBook', default='AddressBook.txt', help="Text file with one email address in each line. Emails will be sent to all.")
 argparser.add_argument('-o', '--OutputFile', default='DHT11Log.csv', help='File where the output will be written (CSV format).')
 argparser.add_argument('-p', '--PasswordFile', default='password.txt', help='File that stores email smtp password in its first line.')
 argparser.add_argument('-s', '--SamplingIntervalMin', type=float, default=0.05, help='Period in minutes between two consecutive measurements.')
@@ -32,10 +33,11 @@ TemperatureThreshold = float(args.ThresholdCelsius)
 
 # Print parameters, so user can check if they are right.
 
-print('Output will be logged in:', args.OutputFile)
-print('Email smtp password file:', args.PasswordFile)
+print('Using email addresses from:', args.AddressBook)
+print('Output will be logged in:  ', args.OutputFile)
+print('Email smtp password file:  ', args.PasswordFile)
+print('Temperature threshold:     ', TemperatureThreshold)
 print('Data will be recorded in every', float(args.SamplingIntervalMin), "minutes")
-print('Temperature threshold:', TemperatureThreshold)
 
 # Find Arduino device.
 
@@ -137,7 +139,7 @@ while True:
   try:
     CurrentTemp = float(TemprText)
   except:
-    logging.error('TemprText cannot be converted:' + tTxt)
+    logging.error('TemprText cannot be converted:' + TemprText)
     logging.error(sys.exc_info()[0])
     continue
 
@@ -178,17 +180,29 @@ while True:
     logging.error(sys.exc_info()[0])
     continue
 
-  # Sending email.
+  # Read smtp password from file.
 
   try:
     PasswordFile = open(args.PasswordFile, "r")
     SmtpPassword = PasswordFile.readline()
     PasswordFile.close()
   except:
-    logging.error("Unable to read password.txt. Email will not be sent.")
+    logging.error("Unable to read file: " + args.PasswordFile + " - Email will not be sent.")
     SendEmail = False
 
-  Recipients = ["ungi@queensu.ca", "ungi.tamas@gmail.com"]
+  # Read recipient email addresses from file.
+
+  try:
+    AddressFile = open(args.AddressBook, 'r')
+    Recipients = AddressFile.readlines()
+  except:
+    logging.error("Unable to read address book file: " + args.AddressBook + " - Email will not be sent.")
+    SendEmail = False
+
+  for i in range(len(Recipients)):
+    Recipients[i] = Recipients[i].rstrip()  # Removing endline characters.
+
+  # Sending email.
 
   if SendEmail == True:
     sender = "perk.lab.log@gmail.com"
