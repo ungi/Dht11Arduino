@@ -17,10 +17,11 @@ from PyQt5.QtCore import *
 argparser = argparse.ArgumentParser(description='Log data from DHT11 temperature and humidity sensor.')
 argparser.add_argument('-a', '--AddressBook', default='AddressBook.txt', help="Text file with one email address in each line. Emails will be sent to all.")
 argparser.add_argument('-o', '--OutputFile', default='DHT11Log.csv', help='File where the output will be written (CSV format).')
-argparser.add_argument('-p', '--PasswordFile', default='password.txt', help='File that stores email smtp password in its first line.')
+argparser.add_argument('-p', '--PasswordFile', default='password.txt', help='File that stores email smtp username and password in the first and second line.')
 argparser.add_argument('-s', '--SamplingIntervalMin', type=float, default=0.05, help='Period in minutes between two consecutive measurements.')
 argparser.add_argument('-t', '--ThresholdCelsius', type=float, default=24.0, help='Trigger threshold temperature that activates warning.')
 argparser.add_argument('-d', '--DebugMode', action='store_true', help='Set this for debug mode logging.')
+argparser.add_argument('-f', '--From', default="DHT Monitor", help='What should appear as sender in the emails')
 args = argparser.parse_args()
 
 if args.DebugMode:
@@ -34,6 +35,7 @@ TemperatureThreshold = float(args.ThresholdCelsius)
 # Print parameters, so user can check if they are right.
 
 print('Using email addresses from:', args.AddressBook)
+print('Email sender:              ', args.From)
 print('Output will be logged in:  ', args.OutputFile)
 print('Email smtp password file:  ', args.PasswordFile)
 print('Temperature threshold:     ', TemperatureThreshold)
@@ -184,6 +186,7 @@ while True:
 
   try:
     PasswordFile = open(args.PasswordFile, "r")
+    SmtpUser = PasswordFile.readline()
     SmtpPassword = PasswordFile.readline()
     PasswordFile.close()
   except:
@@ -205,22 +208,21 @@ while True:
   # Sending email.
 
   if SendEmail == True:
-    sender = "perk.lab.log@gmail.com"
     msg = MIMEMultipart()
-    msg['From'] = 'perk.lab.log@gmail.com'
+    msg['From'] = args.From
     msg['To'] = 'Undisclosed recipients'
-    msg['Subject'] = "Perk Lab humidity = " + HumidText + "%, temperature = " + str(FilteredCurrentTemp) + "C [end]"
+    msg['Subject'] = "Humidity = " + HumidText + "%, temperature = " + str(FilteredCurrentTemp) + "C [end]"
     text=msg.as_string()
     server = smtplib.SMTP('smtp.gmail.com:587')
     server.ehlo()
     server.starttls()
     try:
-      server.login('perk.lab.log@gmail.com', SmtpPassword)
+      server.login(SmtpUser, SmtpPassword)
     except:
       print("Email login error")
       logging.error(sys.exc_info()[0])
     try:
-      server.sendmail(sender, Recipients, text)
+      server.sendmail(SmtpUser, Recipients, text)
       logging.debug('Email sent')
     except:
       print("Error sending email")
